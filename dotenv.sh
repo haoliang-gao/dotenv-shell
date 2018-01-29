@@ -8,12 +8,7 @@ log_verbose() {
 }
 
 is_set() {
-	eval val=\""\$$1"\"
-	if [ -z "$val" ]; then
-		return 1
-	else
-		return 0
-	fi
+	[ -n "$(eval "echo \$$1")" ]
 }
 
 is_comment() {
@@ -29,7 +24,7 @@ is_comment() {
 is_blank() {
 	case "$1" in
 	'')
-		log_verbose "Skip: $1"
+		log_verbose "Skip: _"
 		return 0
 		;;
 	esac
@@ -47,32 +42,65 @@ export_envs() {
 		fi
 
 		if is_set "$key"; then
-			log_verbose "Existing: $key=$val"
+			log_verbose "Existing: $key"
 		else
 			value=$(eval echo "$temp")
+			log_verbose "Exporting: $key:$value"
 			eval export "$key='$value'";
 		fi
 	done < $1
 }
 
 # inject .env configs into the shell
-if [ -f ".env" ]; then
-	export_envs ".env"
-else
-	echo '$DOTENV_FILE file not found'
-fi
+inject_dotenv() {
+	if is_set "DOTENV_FILE"; then
+		log_verbose "Using file: $DOTENV_FILE"
+		if [ -f "$DOTENV_FILE" ]; then
+			export_envs "$DOTENV_FILE"
+			return 0
+		else
+			>&2 echo "'$DOTENV_FILE' is not a regular file."
+			return 1
+		fi
+	fi
+
+	log_verbose "Using file: .env"
+	if [ -f ".env" ]; then
+		export_envs ".env"
+		return 0
+	else
+		>&2 echo ".env is not a regular file."
+		return 1
+	fi
+}
 
 # inject any defaults into the shell
-if is_set "DOTENV_DEFAULT"; then
-	log_verbose "Setting defaults via $DOTENV_DEFAULT"
-	if [ -f "$DOTENV_DEFAULT" ]; then
-		export_envs "$DOTENV_DEFAULT"
-	else
-		echo '$DOTENV_DEFAULT file not found'
+inject_default_dotenv() {
+	if is_set "DOTENV_DEFAULT"; then
+		log_verbose "Setting defaults via $DOTENV_DEFAULT"
+		if [ -f "$DOTENV_DEFAULT" ]; then
+			export_envs "$DOTENV_DEFAULT"
+			return 0
+		else
+			>&2 echo "$DOTENV_DEFAULT file not found"
+			return 1
+		fi
 	fi
-fi
 
-# then run whatever commands you like
-if [ $# -gt 0 ]; then
-	exec "$@"
-fi
+	log_verbose "Skip DOTENV_DEFAULT as it was not set"
+}
+
+main() {
+
+	inject_dotenv || exit 1
+	inject_default_dotenv || exit 1
+
+	# then run whatever commands you like
+	if [ $# -gt 0 ]; then
+		exec "$@"
+	fi
+}
+
+main "$@"
+
+# vim:nolist noet

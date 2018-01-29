@@ -53,23 +53,14 @@ export_envs() {
 
 # inject .env configs into the shell
 inject_dotenv() {
-	if is_set "DOTENV_FILE"; then
-		log_verbose "Using file: $DOTENV_FILE"
-		if [ -f "$DOTENV_FILE" ]; then
-			export_envs "$DOTENV_FILE"
-			return 0
-		else
-			>&2 echo "'$DOTENV_FILE' is not a regular file."
-			return 1
-		fi
-	fi
+	local final_env_file=${DOTENV_FILE:-.env}
 
-	log_verbose "Using file: .env"
-	if [ -f ".env" ]; then
-		export_envs ".env"
+	log_verbose "Using file: $final_env_file"
+	if [ -f "$final_env_file" ]; then
+		export_envs "$final_env_file"
 		return 0
 	else
-		>&2 echo ".env is not a regular file."
+		>&2 echo "$final_env_file is not a regular file."
 		return 1
 	fi
 }
